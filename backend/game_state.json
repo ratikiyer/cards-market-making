@@ -1,0 +1,177 @@
+{
+  "default": {
+    "tid": "default",
+    "players": {
+      "cdfc67b0-4ad1-4a6d-9e0f-35c566f55037": {
+        "pid": "cdfc67b0-4ad1-4a6d-9e0f-35c566f55037",
+        "name": "ratik",
+        "seat": 6,
+        "stack": 1007.0,
+        "buy_in": 1000,
+        "pnl": 7.0,
+        "cards": [
+          "KD",
+          "9S"
+        ],
+        "status": "active"
+      },
+      "40699a38-7a71-43d6-85af-267020b0c3d4": {
+        "pid": "40699a38-7a71-43d6-85af-267020b0c3d4",
+        "name": "sosa",
+        "seat": 3,
+        "stack": 1000,
+        "buy_in": 1000,
+        "pnl": 0,
+        "cards": [
+          "6C",
+          "QD"
+        ],
+        "status": "active"
+      }
+    },
+    "seat_order": [
+      "cdfc67b0-4ad1-4a6d-9e0f-35c566f55037",
+      "40699a38-7a71-43d6-85af-267020b0c3d4"
+    ],
+    "maker_idx": 0,
+    "deck": [
+      "2D",
+      "5C",
+      "AD",
+      "2H",
+      "4C",
+      "5S",
+      "4H",
+      "AC",
+      "4D",
+      "QS",
+      "8D",
+      "9H",
+      "8H",
+      "3D",
+      "6D",
+      "3S",
+      "2S",
+      "QH",
+      "JC",
+      "5D",
+      "4S",
+      "7C",
+      "TH",
+      "7H",
+      "9C",
+      "KH",
+      "KC",
+      "9D",
+      "8S",
+      "JH",
+      "3C",
+      "JS",
+      "6S",
+      "KS",
+      "5H",
+      "AH",
+      "AS",
+      "QC",
+      "7D",
+      "TC",
+      "TD",
+      "2C",
+      "7S",
+      "TS",
+      "3H",
+      "8C",
+      "JD",
+      "6H"
+    ],
+    "community": [],
+    "round_num": 0,
+    "trades": [],
+    "quotes": [
+      {
+        "bid": 50.0,
+        "ask": 63.0,
+        "round": 0,
+        "maker": "cdfc67b0-4ad1-4a6d-9e0f-35c566f55037"
+      }
+    ],
+    "round_trades": [],
+    "hand_number": 3,
+    "game_history": [
+      {
+        "hand_number": 1,
+        "trades": [
+          {
+            "pid": "7ea3d3ca-62ce-41b4-b545-2a24dc3b5fc8",
+            "side": "buy",
+            "price": 55.0,
+            "round": 0
+          },
+          {
+            "pid": "7ea3d3ca-62ce-41b4-b545-2a24dc3b5fc8",
+            "side": "buy",
+            "price": 55.0,
+            "round": 1
+          },
+          {
+            "pid": "7ea3d3ca-62ce-41b4-b545-2a24dc3b5fc8",
+            "side": "sell",
+            "price": 50.0,
+            "round": 2
+          },
+          {
+            "pid": "7ea3d3ca-62ce-41b4-b545-2a24dc3b5fc8",
+            "side": "buy",
+            "price": 55.0,
+            "round": 3
+          }
+        ],
+        "quotes": [
+          {
+            "bid": 50.0,
+            "ask": 55.0,
+            "round": 0,
+            "maker": "cdfc67b0-4ad1-4a6d-9e0f-35c566f55037"
+          },
+          {
+            "bid": 50.0,
+            "ask": 55.0,
+            "round": 1,
+            "maker": "cdfc67b0-4ad1-4a6d-9e0f-35c566f55037"
+          },
+          {
+            "bid": 50.0,
+            "ask": 55.0,
+            "round": 2,
+            "maker": "cdfc67b0-4ad1-4a6d-9e0f-35c566f55037"
+          },
+          {
+            "bid": 50.0,
+            "ask": 55.0,
+            "round": 3,
+            "maker": "cdfc67b0-4ad1-4a6d-9e0f-35c566f55037"
+          }
+        ],
+        "final_total": 54,
+        "maker": "7ea3d3ca-62ce-41b4-b545-2a24dc3b5fc8",
+        "timestamp": 1754380359.379756
+      }
+    ],
+    "max_history_hands": 100,
+    "left_players": {
+      "7ea3d3ca-62ce-41b4-b545-2a24dc3b5fc8": {
+        "pid": "7ea3d3ca-62ce-41b4-b545-2a24dc3b5fc8",
+        "name": "sosa",
+        "seat": 7,
+        "stack": 993.0,
+        "buy_in": 1000,
+        "pnl": -7.0,
+        "cards": [
+          "JD",
+          "4C"
+        ],
+        "status": "left"
+      }
+    }
+  }
+}
