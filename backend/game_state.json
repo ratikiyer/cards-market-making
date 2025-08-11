@@ -2,176 +2,177 @@
   "default": {
     "tid": "default",
     "players": {
-      "cdfc67b0-4ad1-4a6d-9e0f-35c566f55037": {
-        "pid": "cdfc67b0-4ad1-4a6d-9e0f-35c566f55037",
+      "574ba733-c568-4c74-92fe-c15479c9c76c": {
+        "pid": "574ba733-c568-4c74-92fe-c15479c9c76c",
         "name": "ratik",
-        "seat": 6,
-        "stack": 1007.0,
+        "seat": 1,
+        "stack": 1002.0,
         "buy_in": 1000,
-        "pnl": 7.0,
+        "pnl": 2.0,
         "cards": [
-          "KD",
-          "9S"
+          "9C",
+          "QS"
         ],
         "status": "active"
       },
-      "40699a38-7a71-43d6-85af-267020b0c3d4": {
-        "pid": "40699a38-7a71-43d6-85af-267020b0c3d4",
+      "8878bd55-243b-4869-84b3-63601b1aee55": {
+        "pid": "8878bd55-243b-4869-84b3-63601b1aee55",
         "name": "sosa",
-        "seat": 3,
-        "stack": 1000,
+        "seat": 5,
+        "stack": 998.0,
         "buy_in": 1000,
-        "pnl": 0,
+        "pnl": -2.0,
         "cards": [
-          "6C",
-          "QD"
+          "2H",
+          "7D"
         ],
         "status": "active"
       }
     },
     "seat_order": [
-      "cdfc67b0-4ad1-4a6d-9e0f-35c566f55037",
-      "40699a38-7a71-43d6-85af-267020b0c3d4"
+      "8878bd55-243b-4869-84b3-63601b1aee55",
+      "574ba733-c568-4c74-92fe-c15479c9c76c"
     ],
-    "maker_idx": 0,
+    "maker_idx": 1,
     "deck": [
-      "2D",
+      "9D",
+      "AH",
+      "KH",
+      "6H",
+      "4H",
+      "6S",
+      "AS",
+      "8H",
+      "3H",
+      "KS",
+      "6D",
+      "9S",
+      "4S",
+      "9H",
+      "JH",
+      "7H",
+      "7S",
+      "6C",
       "5C",
       "AD",
-      "2H",
-      "4C",
-      "5S",
-      "4H",
-      "AC",
-      "4D",
-      "QS",
-      "8D",
-      "9H",
-      "8H",
-      "3D",
-      "6D",
-      "3S",
-      "2S",
-      "QH",
       "JC",
-      "5D",
-      "4S",
       "7C",
-      "TH",
-      "7H",
-      "9C",
-      "KH",
-      "KC",
-      "9D",
-      "8S",
-      "JH",
-      "3C",
       "JS",
-      "6S",
-      "KS",
+      "3C",
       "5H",
-      "AH",
-      "AS",
-      "QC",
-      "7D",
-      "TC",
-      "TD",
-      "2C",
-      "7S",
-      "TS",
-      "3H",
-      "8C",
+      "5S",
+      "QD",
       "JD",
-      "6H"
+      "5D",
+      "8C",
+      "TS",
+      "2S",
+      "2C",
+      "QC",
+      "AC",
+      "TD",
+      "4D",
+      "QH",
+      "KD",
+      "3D",
+      "2D",
+      "TC",
+      "KC",
+      "4C",
+      "8S"
     ],
-    "community": [],
-    "round_num": 0,
-    "trades": [],
+    "community": [
+      "8D",
+      "3S",
+      "TH"
+    ],
+    "round_num": 4,
+    "trades": [
+      {
+        "pid": "574ba733-c568-4c74-92fe-c15479c9c76c",
+        "side": "buy",
+        "price": 51.0,
+        "round": 0
+      },
+      {
+        "pid": "574ba733-c568-4c74-92fe-c15479c9c76c",
+        "side": "buy",
+        "price": 52.0,
+        "round": 1
+      },
+      {
+        "pid": "574ba733-c568-4c74-92fe-c15479c9c76c",
+        "side": "buy",
+        "price": 48.0,
+        "round": 2
+      },
+      {
+        "pid": "574ba733-c568-4c74-92fe-c15479c9c76c",
+        "side": "buy",
+        "price": 51.0,
+        "round": 3
+      }
+    ],
     "quotes": [
       {
-        "bid": 50.0,
-        "ask": 63.0,
+        "bid": 39.0,
+        "ask": 51.0,
         "round": 0,
-        "maker": "cdfc67b0-4ad1-4a6d-9e0f-35c566f55037"
+        "maker": "8878bd55-243b-4869-84b3-63601b1aee55"
+      },
+      {
+        "bid": 41.0,
+        "ask": 52.0,
+        "round": 1,
+        "maker": "8878bd55-243b-4869-84b3-63601b1aee55"
+      },
+      {
+        "bid": 37.0,
+        "ask": 48.0,
+        "round": 2,
+        "maker": "8878bd55-243b-4869-84b3-63601b1aee55"
+      },
+      {
+        "bid": 41.0,
+        "ask": 51.0,
+        "round": 3,
+        "maker": "8878bd55-243b-4869-84b3-63601b1aee55"
       }
     ],
     "round_trades": [],
-    "hand_number": 3,
-    "game_history": [
-      {
-        "hand_number": 1,
-        "trades": [
-          {
-            "pid": "7ea3d3ca-62ce-41b4-b545-2a24dc3b5fc8",
-            "side": "buy",
-            "price": 55.0,
-            "round": 0
-          },
-          {
-            "pid": "7ea3d3ca-62ce-41b4-b545-2a24dc3b5fc8",
-            "side": "buy",
-            "price": 55.0,
-            "round": 1
-          },
-          {
-            "pid": "7ea3d3ca-62ce-41b4-b545-2a24dc3b5fc8",
-            "side": "sell",
-            "price": 50.0,
-            "round": 2
-          },
-          {
-            "pid": "7ea3d3ca-62ce-41b4-b545-2a24dc3b5fc8",
-            "side": "buy",
-            "price": 55.0,
-            "round": 3
-          }
-        ],
-        "quotes": [
-          {
-            "bid": 50.0,
-            "ask": 55.0,
-            "round": 0,
-            "maker": "cdfc67b0-4ad1-4a6d-9e0f-35c566f55037"
-          },
-          {
-            "bid": 50.0,
-            "ask": 55.0,
-            "round": 1,
-            "maker": "cdfc67b0-4ad1-4a6d-9e0f-35c566f55037"
-          },
-          {
-            "bid": 50.0,
-            "ask": 55.0,
-            "round": 2,
-            "maker": "cdfc67b0-4ad1-4a6d-9e0f-35c566f55037"
-          },
-          {
-            "bid": 50.0,
-            "ask": 55.0,
-            "round": 3,
-            "maker": "cdfc67b0-4ad1-4a6d-9e0f-35c566f55037"
-          }
-        ],
-        "final_total": 54,
-        "maker": "7ea3d3ca-62ce-41b4-b545-2a24dc3b5fc8",
-        "timestamp": 1754380359.379756
-      }
-    ],
+    "hand_number": 1,
+    "game_history": [],
     "max_history_hands": 100,
-    "left_players": {
-      "7ea3d3ca-62ce-41b4-b545-2a24dc3b5fc8": {
-        "pid": "7ea3d3ca-62ce-41b4-b545-2a24dc3b5fc8",
-        "name": "sosa",
-        "seat": 7,
-        "stack": 993.0,
-        "buy_in": 1000,
-        "pnl": -7.0,
-        "cards": [
-          "JD",
-          "4C"
-        ],
-        "status": "left"
+    "left_players": {},
+    "auction_enabled": true,
+    "max_spreads": [
+      10,
+      10,
+      10,
+      10
+    ],
+    "current_max_width": 5.0,
+    "awaiting_hand_start": true,
+    "width_auction_active": false,
+    "width_auction_bids": {
+      "574ba733-c568-4c74-92fe-c15479c9c76c": {
+        "width": 5.0,
+        "timestamp": 1754796983.2477639
+      },
+      "8878bd55-243b-4869-84b3-63601b1aee55": {
+        "width": 5.0,
+        "timestamp": 1754796984.2649841
       }
-    }
+    },
+    "width_auction_start_time": 1754796973.0285509,
+    "width_auction_timeout": 30,
+    "auction_time_remaining": 0,
+    "auction_completed_this_round": true,
+    "eligible_makers": [
+      "574ba733-c568-4c74-92fe-c15479c9c76c",
+      "8878bd55-243b-4869-84b3-63601b1aee55"
+    ],
+    "auction_maker": "574ba733-c568-4c74-92fe-c15479c9c76c",
+    "auction_winning_width": 5.0
   }
 }

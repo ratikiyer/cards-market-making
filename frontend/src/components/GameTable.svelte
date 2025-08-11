@@ -6,6 +6,8 @@
   import GameLog from './GameLog.svelte';
   import Leaderboard from './Leaderboard.svelte';
   import MarketMakerPanel from './MarketMakerPanel.svelte';
+  import Options from './Options.svelte';
+  import WidthAuction from './WidthAuction.svelte';
 
   export let gameState: Writable<any>;
   export let pid: Writable<string>;
@@ -14,6 +16,7 @@
 
   $: currentPlayer = $gameState.players?.find((p: any) => p.pid === $pid);
   $: isMaker = $gameState.maker === $pid;
+  $: canMakeMarket = isMaker && (!auctionEnabled || auctionCompletedThisRound);
   $: sortedPlayers = $gameState.all_players ? 
     [...$gameState.all_players].sort((a: any, b: any) => b.pnl - a.pnl) : 
     ($gameState.players ? [...$gameState.players].sort((a: any, b: any) => b.pnl - a.pnl) : []);
@@ -23,16 +26,55 @@
   let showLog = true;
   let showMarketMakerPanel = false;
   let hasSubmittedQuoteThisRound = false;
+  let auctionStartAttempted = false; // Track if we've attempted to start auction this round
+  
+  // Auction state
+  $: auctionEnabled = $gameState.auction_enabled || false;
+  $: widthAuctionActive = $gameState.width_auction_active || false;
+  $: auctionCompletedThisRound = $gameState.auction_completed_this_round || false;
+  $: currentMaxWidth = $gameState.current_max_width || 10;
+  $: awaitingHandStart = $gameState.awaiting_hand_start || false;
+
+  // Auto-trigger auction when conditions are met
+  $: {
+    if (auctionEnabled && 
+        !widthAuctionActive && 
+        !auctionCompletedThisRound && 
+        $gameState.players && 
+        $gameState.players.length >= 2 &&
+        !hasCurrentRoundQuote &&
+        !auctionStartAttempted &&
+        !awaitingHandStart &&
+        $gameState.round !== undefined &&
+        $gameState.round >= 0 && 
+        $gameState.round <= 3) {
+      // Small delay to ensure all state updates are processed
+      setTimeout(() => {
+        if (auctionEnabled && 
+            !$gameState.width_auction_active && 
+            !$gameState.auction_completed_this_round &&
+            !auctionStartAttempted &&
+            !$gameState.awaiting_hand_start &&
+            $gameState.round !== undefined &&
+            $gameState.round >= 0 && 
+            $gameState.round <= 3) {
+          auctionStartAttempted = true;
+          sendMessage({ action: 'start_width_auction' });
+        }
+      }, 100);
+    }
+  }
 
   // Computed values for game state
   $: hasCurrentRoundQuote = $gameState.quotes?.some((quote: any) => quote.round === $gameState.round) || false;
-  $: needsMarketMaker = isMaker && $gameState.players && $gameState.players.length >= 2 && !hasCurrentRoundQuote;
+  $: needsMarketMaker = canMakeMarket && $gameState.players && $gameState.players.length >= 2 && !hasCurrentRoundQuote;
 
   // Reset quote submission flag when round changes
   let previousRound = -1;
   $: {
     if ($gameState.round !== undefined && $gameState.round !== previousRound) {
       hasSubmittedQuoteThisRound = false;
+      auctionStartAttempted = false; // Reset auction attempt flag for new round
       previousRound = $gameState.round;
     }
   }
@@ -52,6 +94,7 @@
   }
 
   function handleQuote(bid: number, ask: number) {
+    console.log('GameTable handleQuote called', { bid, ask });
     sendMessage({ action: 'quote', bid, ask });
     showMarketMakerPanel = false;
     hasSubmittedQuoteThisRound = true; // Prevent auto-reopening this round
@@ -84,6 +127,10 @@
     }
   }
 
+  function startHand() {
+    sendMessage({ action: 'start_hand' });
+  }
+
   // Removed nextRound function - now automatic
 
   // Create an array of 7 seats with players positioned correctly
@@ -109,6 +156,11 @@
       <button class="btn btn-secondary log-toggle" on:click={() => showLog = !showLog}>
         {showLog ? '📊 Hide Log' : '📊 Show Log'}
       </button>
+      {#if awaitingHandStart}
+        <button class="btn btn-primary start-hand-btn" on:click={startHand}>
+          🎯 Start Hand
+        </button>
+      {/if}
     </div>
     
     <div class="top-center">
@@ -156,11 +208,39 @@
             {handleTrade}
             currentQuote={$gameState.quotes?.[$gameState.quotes?.length - 1]}
           />
-        {:else if isMaker && !hasCurrentRoundQuote}
+        {:else if isMaker && !hasCurrentRoundQuote && $gameState.round !== undefined && $gameState.round >= 0 && $gameState.round <= 3}
           <div class="maker-actions">
-            <button class="btn btn-danger set-market-btn" on:click={() => showMarketMakerPanel = true}>
-              Quote Market
-            </button>
+            {#if auctionEnabled && !auctionCompletedThisRound}
+              <!-- Show status when auction is enabled but not completed -->
+              {#if widthAuctionActive}
+                <div class="auction-in-progress">
+                  <span class="auction-status">🔨 Auction in Progress...</span>
+                </div>
+              {:else}
+                <div class="auction-pending">
+                  <span class="auction-status">⏳ Starting Auction...</span>
+                </div>
+              {/if}
+            {:else if auctionEnabled && auctionCompletedThisRound}
+              <!-- Show completed status when auction is done - only auction winner can quote -->
+              {#if canMakeMarket}
+                <div class="auction-complete">
+                  <span class="auction-status">✅ Auction Complete</span>
+                  <button class="btn btn-danger set-market-btn" on:click={() => showMarketMakerPanel = true}>
+                    Quote Market
+                  </button>
+                </div>
+              {:else}
+                <div class="auction-complete">
+                  <span class="auction-status">✅ Auction Won by Another Player</span>
+                </div>
+              {/if}
+            {:else}
+              <!-- Normal mode - show quote market button directly -->
+              <button class="btn btn-danger set-market-btn" on:click={() => showMarketMakerPanel = true}>
+                Quote Market
+              </button>
+            {/if}
           </div>
         {:else if $gameState.players && $gameState.players.length < 2}
           <div class="waiting-message">Waiting for more players to join...</div>
@@ -202,11 +282,13 @@
   </div>
 
   <!-- Market Maker Panel - Only shows automatically for makers -->
-  {#if isMaker && showMarketMakerPanel}
+  {#if canMakeMarket && showMarketMakerPanel}
     <MarketMakerPanel 
       onQuote={handleQuote}
       currentQuote={$gameState.quotes?.[$gameState.quotes?.length - 1]}
+      currentMaxWidth={currentMaxWidth}
       onClose={closeMarketMakerPanel}
+      gameState={$gameState}
     />
   {/if}
 
@@ -216,13 +298,20 @@
   {/if}
 
   {#if showOptions}
-    <div class="modal-overlay" on:click={() => showOptions = false} on:keydown={(e) => e.key === 'Escape' && (showOptions = false)} role="button" tabindex="0">
-      <div class="modal" on:click|stopPropagation role="dialog">
-        <h3>Options</h3>
-        <p>Settings panel - to be implemented</p>
-        <button class="btn btn-secondary" on:click={() => showOptions = false}>Close</button>
-      </div>
-    </div>
+    <Options 
+      gameState={$gameState}
+      sendMessage={sendMessage}
+      onClose={() => showOptions = false}
+    />
+  {/if}
+
+  <!-- Width Auction Modal -->
+  {#if widthAuctionActive}
+    <WidthAuction 
+      gameState={$gameState}
+      pid={$pid}
+      sendMessage={sendMessage}
+    />
   {/if}
 </div>
 
@@ -475,5 +564,54 @@
   .modal h3 {
     margin-top: 0;
     color: #4CAF50;
+  }
+
+  .auction-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .auction-btn:disabled:hover {
+    transform: none;
+    box-shadow: none;
+  }
+
+  .auction-in-progress, .auction-complete {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .auction-pending {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    background: rgba(255, 193, 7, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 193, 7, 0.3);
+  }
+
+  .auction-status {
+    color: #ff8c42;
+    font-weight: 600;
+    font-size: 1rem;
+  }
+
+  .auction-complete {
+    padding: 8px;
+    background: rgba(76, 175, 80, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(76, 175, 80, 0.3);
+  }
+
+  .auction-in-progress {
+    padding: 8px;
+    background: rgba(255, 140, 66, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 140, 66, 0.3);
   }
 </style> 

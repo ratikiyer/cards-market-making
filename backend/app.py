@@ -98,6 +98,23 @@ class Table:
         # Keep track of players who have left (for leaderboard/history)
         self.left_players: Dict[str, Player] = {}  # pid -> Player (preserves their final state)
 
+        # Auction settings
+        self.auction_enabled = False  # Toggle for auction for market width
+        self.max_spreads = [10, 10, 10, 10]  # Max spread for rounds 0-3
+        self.current_max_width = 10  # Current maximum allowed market width for this round
+        self.awaiting_hand_start = False  # True when waiting for manual hand start
+        
+        # Width auction state
+        self.width_auction_active = False
+        self.width_auction_bids: Dict[str, dict] = {}  # pid -> {width, timestamp}
+        self.width_auction_start_time = None
+        self.width_auction_timeout = 30  # 30 seconds
+        self.auction_time_remaining = 30  # Real-time countdown for frontend
+        self.auction_completed_this_round = False  # Track if auction completed for current round
+        self.eligible_makers: List[str] = []  # Players eligible to be market maker
+        self.auction_maker = None  # Winner of the auction
+        self.auction_winning_width = None  # The committed width from auction
+
         self.lock = asyncio.Lock()
 
     def to_dict(self):
@@ -116,7 +133,20 @@ class Table:
             "hand_number": self.hand_number,
             "game_history": self.game_history,
             "max_history_hands": self.max_history_hands,
-            "left_players": {pid: player.to_dict() for pid, player in self.left_players.items()}
+            "left_players": {pid: player.to_dict() for pid, player in self.left_players.items()},
+            "auction_enabled": self.auction_enabled,
+            "max_spreads": self.max_spreads,
+            "current_max_width": self.current_max_width,
+            "awaiting_hand_start": self.awaiting_hand_start,
+            "width_auction_active": self.width_auction_active,
+            "width_auction_bids": self.width_auction_bids,
+            "width_auction_start_time": self.width_auction_start_time,
+            "width_auction_timeout": self.width_auction_timeout,
+            "auction_time_remaining": self.auction_time_remaining,
+            "auction_completed_this_round": self.auction_completed_this_round,
+            "eligible_makers": self.eligible_makers,
+            "auction_maker": self.auction_maker,
+            "auction_winning_width": self.auction_winning_width
         }
 
     @classmethod
@@ -136,6 +166,19 @@ class Table:
         table.game_history = data.get("game_history", [])
         table.max_history_hands = data.get("max_history_hands", 100)
         table.left_players = {pid: Player.from_dict(pdata) for pid, pdata in data.get("left_players", {}).items()}
+        table.auction_enabled = data.get("auction_enabled", False)
+        table.max_spreads = data.get("max_spreads", [10, 10, 10, 10])
+        table.current_max_width = data.get("current_max_width", 10)
+        table.awaiting_hand_start = data.get("awaiting_hand_start", False)
+        table.width_auction_active = data.get("width_auction_active", False)
+        table.width_auction_bids = data.get("width_auction_bids", {})
+        table.width_auction_start_time = data.get("width_auction_start_time")
+        table.width_auction_timeout = data.get("width_auction_timeout", 30)
+        table.auction_time_remaining = data.get("auction_time_remaining", 30)
+        table.auction_completed_this_round = data.get("auction_completed_this_round", False)
+        table.eligible_makers = data.get("eligible_makers", [])
+        table.auction_maker = data.get("auction_maker")
+        table.auction_winning_width = data.get("auction_winning_width")
         return table
 
     # ---- gameplay state helpers ---------------------------------------------
@@ -200,8 +243,23 @@ class Table:
         self.trades.clear()
         self.quotes.clear()
         self.round_trades.clear()
+        
+        # Reset auction state
+        self.auction_maker = None
+        self.auction_winning_width = None
+        self.width_auction_active = False
+        self.width_auction_bids = {}
+        self.width_auction_start_time = None
+        self.auction_time_remaining = self.width_auction_timeout
+        self.eligible_makers = []
+        self.auction_completed_this_round = False
+        self.awaiting_hand_start = False  # Reset when hand actually starts
+        
         for p in self.players.values():
             p.cards = [self.deck.pop(), self.deck.pop()]
+        
+        # Update current max width for round 0
+        self.update_current_max_width()
         
         # Return info about players who left for event handling
         return leaving_players
@@ -211,6 +269,10 @@ class Table:
             self.community.append(self.deck.pop())
         self.round_num += 1
         self.round_trades.clear()  # Reset trades for new round
+        self.auction_completed_this_round = False  # Allow new auction for new round
+        
+        # Update current max width for the new round
+        self.update_current_max_width()
 
     def rotate_maker(self):
         if self.seat_order:
@@ -320,6 +382,179 @@ class Table:
         
         return all_players
 
+    # ---- Width Auction Methods --------------------------------------------------------
+
+    def start_width_auction(self):
+        """Start a width auction for the next hand"""
+        if not self.auction_enabled:
+            return False
+            
+        # Check if we're awaiting a hand start (between hands)
+        if self.awaiting_hand_start:
+            return False
+            
+        # Check if we're in a settlement round (round 4+) or invalid round
+        if self.round_num < 0 or self.round_num > 3:
+            return False
+            
+        # Check if auction already completed for this round
+        if self.auction_completed_this_round:
+            return False
+            
+        # Only auction if we have 2+ players
+        active_players = [pid for pid, p in self.players.items() if p.status == "active"]
+        if len(active_players) < 2:
+            return False
+            
+        self.width_auction_active = True
+        self.width_auction_bids = {}
+        self.width_auction_start_time = time.time()
+        self.auction_time_remaining = self.width_auction_timeout  # Initialize countdown
+        self.eligible_makers = active_players.copy()
+        self.auction_maker = None
+        self.auction_completed_this_round = False # Reset for new round
+        return True
+
+    def submit_width_bid(self, pid: str, width: float) -> dict:
+        """Submit a bid for market width"""
+        if not self.width_auction_active:
+            return {"success": False, "error": "No auction active"}
+            
+        if pid not in self.eligible_makers:
+            return {"success": False, "error": "Not eligible to bid"}
+            
+        if pid in self.width_auction_bids:
+            return {"success": False, "error": "Already submitted a bid"}
+            
+        if width <= 0:
+            return {"success": False, "error": "Width must be positive"}
+            
+        # Check if auction has timed out
+        if time.time() - self.width_auction_start_time > self.width_auction_timeout:
+            return {"success": False, "error": "Auction has timed out"}
+            
+        self.width_auction_bids[pid] = {
+            "width": width,
+            "timestamp": time.time()
+        }
+        
+        return {"success": True}
+
+    def check_auction_complete(self) -> bool:
+        """Check if all eligible players have bid or timeout reached"""
+        if not self.width_auction_active:
+            return False
+            
+        # Check timeout
+        if time.time() - self.width_auction_start_time > self.width_auction_timeout:
+            return True
+            
+        # Check if all eligible players have bid
+        return len(self.width_auction_bids) >= len(self.eligible_makers)
+
+    def resolve_width_auction(self) -> dict:
+        """Determine winner of width auction and return results"""
+        if not self.width_auction_active:
+            return {"success": False, "error": "No auction active"}
+            
+        if not self.width_auction_bids:
+            # No bids - use default rotation
+            self.width_auction_active = False
+            self.auction_completed_this_round = True # Mark as completed
+            return {"success": True, "winner": None, "bids": [], "reason": "no_bids"}
+            
+        # Find minimum width (best bid)
+        min_width = min(bid["width"] for bid in self.width_auction_bids.values())
+        
+        # Find all players with minimum width
+        min_bidders = [
+            pid for pid, bid in self.width_auction_bids.items() 
+            if bid["width"] == min_width
+        ]
+        
+        # In case of tie, choose earliest timestamp
+        if len(min_bidders) > 1:
+            winner = min(min_bidders, key=lambda pid: self.width_auction_bids[pid]["timestamp"])
+        else:
+            winner = min_bidders[0]
+        
+        # Update table state
+        self.auction_maker = winner
+        self.auction_winning_width = min_width
+        
+        # Update current max width to the winning bid
+        self.update_current_max_width()
+        
+        # Update seat order to put winner at current maker position
+        if winner in self.seat_order:
+            winner_idx = self.seat_order.index(winner)
+            self.seat_order[self.maker_idx], self.seat_order[winner_idx] = \
+                self.seat_order[winner_idx], self.seat_order[self.maker_idx]
+        
+        # Remove players who didn't bid from eligible makers for this hand
+        non_bidders = [pid for pid in self.eligible_makers if pid not in self.width_auction_bids]
+        
+        self.width_auction_active = False
+        self.auction_time_remaining = 0  # Stop the timer
+        self.auction_completed_this_round = True # Mark as completed
+        
+        # Format bids for display
+        bids_list = [
+            {
+                "pid": pid,
+                "player_name": self.players[pid].name if pid in self.players else "Unknown",
+                "width": bid["width"],
+                "timestamp": bid["timestamp"]
+            }
+            for pid, bid in self.width_auction_bids.items()
+        ]
+        bids_list.sort(key=lambda x: x["timestamp"])  # Sort by submission time
+        
+        return {
+            "success": True,
+            "winner": winner,
+            "winner_name": self.players[winner].name if winner in self.players else "Unknown",
+            "winning_width": min_width,
+            "bids": bids_list,
+            "non_bidders": [
+                {"pid": pid, "player_name": self.players[pid].name if pid in self.players else "Unknown"}
+                for pid in non_bidders
+            ],
+            "reason": "completed"
+        }
+
+    def get_auction_time_remaining(self) -> float:
+        """Get remaining time in auction"""
+        if not self.width_auction_active:
+            return 0
+        return self.auction_time_remaining
+
+    def update_current_max_width(self):
+        """Update the current maximum width based on auction result or round configuration"""
+        if self.auction_enabled and self.auction_winning_width is not None:
+            # Use the auction winning width
+            self.current_max_width = self.auction_winning_width
+        else:
+            # Use the configured max spread for current round
+            if 0 <= self.round_num < len(self.max_spreads):
+                self.current_max_width = self.max_spreads[self.round_num]
+            else:
+                # Fallback to last configured spread if round exceeds config
+                self.current_max_width = self.max_spreads[-1] if self.max_spreads else 10
+
+    def validate_quote_spread(self, bid: float, ask: float, round_num: int) -> dict:
+        """Validate that the quote spread doesn't exceed the maximum for this round"""
+        spread = ask - bid
+        
+        # Check against current maximum width
+        if spread > self.current_max_width:
+            return {
+                "valid": False,
+                "error": f"Market width ({spread:.2f}) exceeds maximum allowed ({self.current_max_width:.2f})"
+            }
+        
+        return {"valid": True}
+
 # ---------- Persistence helpers ----------------------------------------------
 
 def save_game_state(tables: Dict[str, Table]):
@@ -411,6 +646,16 @@ class ConnectionManager:
                     "quotes": table.quotes,
                     "trades": table.trades,
                     "hand_number": table.hand_number,
+                    "auction_enabled": table.auction_enabled,
+                    "max_spreads": table.max_spreads,
+                    "current_max_width": table.current_max_width,
+                    "awaiting_hand_start": table.awaiting_hand_start,
+                    "width_auction_active": table.width_auction_active,
+                    "auction_time_remaining": table.get_auction_time_remaining(),
+                    "auction_bids_count": len(table.width_auction_bids),
+                    "eligible_makers": table.eligible_makers,
+                    "auction_winning_width": table.auction_winning_width,
+                    "auction_completed_this_round": table.auction_completed_this_round,
                 }
                 
                 # Optionally include recent history (e.g., for game log)
@@ -431,7 +676,7 @@ app = FastAPI(title="Market Maker Game", version="1.0.0")
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:5173", "http://localhost:5174", "http://localhost:5175"],
+    allow_origins=["*"],  # Allow all origins for local network access
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -441,6 +686,57 @@ app.add_middleware(
 # Start fresh each time - don't load previous game state
 tables: Dict[str, Table] = {}
 manager = ConnectionManager()
+
+# Async function to handle auction timeouts with real-time updates
+async def handle_auction_timeout(tid: str):
+    """Handle auction timeout with real-time timer updates"""
+    table = tables.get(tid)
+    if not table or not table.width_auction_active:
+        return
+    
+    # Send timer updates every second for 30 seconds
+    for seconds_left in range(30, 0, -1):
+        # Check if auction is still active
+        if not table.width_auction_active:
+            return
+            
+        # Update the auction time remaining in table state
+        table.auction_time_remaining = seconds_left
+        
+        # Broadcast timer update
+        await manager.broadcast_table(table, {
+            "type": "auction_timer_update",
+            "time_remaining": seconds_left
+        })
+        
+        # Wait 1 second before next update
+        await asyncio.sleep(1)
+    
+    # Time's up - handle timeout
+    if not table or not table.width_auction_active:
+        return
+    
+    async with table.lock:
+        if table.width_auction_active:
+            table.auction_time_remaining = 0
+            auction_result = table.resolve_width_auction()
+            save_game_state(tables)
+            
+            # Broadcast final timer update and timeout results
+            await manager.broadcast_table(table, {
+                "type": "auction_timer_update",
+                "time_remaining": 0
+            })
+            
+            await manager.broadcast_table(table, {
+                "type": "width_auction_timeout",
+                "result": auction_result
+            })
+            
+            # Auction only determines market maker, no new hand needed
+            print(f"Auction timed out. Winner: {auction_result.get('winner_name', 'No winner')}")
+            
+            await manager.broadcast_all_states(table)
 
 # Clear any existing game state file on startup
 try:
@@ -514,6 +810,16 @@ async def websocket_endpoint(ws: WebSocket, tid: str, pid: str):
             "quotes": table.quotes,
             "trades": table.trades,
             "hand_number": table.hand_number,
+            "auction_enabled": table.auction_enabled,
+            "max_spreads": table.max_spreads,
+            "current_max_width": table.current_max_width,
+            "awaiting_hand_start": table.awaiting_hand_start,
+            "width_auction_active": table.width_auction_active,
+            "auction_time_remaining": table.get_auction_time_remaining(),
+            "auction_bids_count": len(table.width_auction_bids),
+            "eligible_makers": table.eligible_makers,
+            "auction_winning_width": table.auction_winning_width,
+            "auction_completed_this_round": table.auction_completed_this_round,
         }
         await manager.send_personal(current_pid, state)
 
@@ -556,6 +862,11 @@ async def websocket_endpoint(ws: WebSocket, tid: str, pid: str):
                         await manager.send_personal(current_pid, {"type": "error", "detail": "Only maker can quote"})
                         continue
                     
+                    # Check if auction is required but not completed
+                    if table.auction_enabled and not table.auction_completed_this_round:
+                        await manager.send_personal(current_pid, {"type": "error", "detail": "You must complete an auction before making a market"})
+                        continue
+                    
                     # Check if maker has already quoted in this round
                     has_current_round_quote = any(
                         quote.get("round", -1) == table.round_num 
@@ -570,6 +881,13 @@ async def websocket_endpoint(ws: WebSocket, tid: str, pid: str):
                     if ask <= bid:
                         await manager.send_personal(current_pid, {"type": "error", "detail": "Ask must be higher than bid"})
                         continue
+                    
+                    # Validate spread limits if auction is enabled
+                    validation = table.validate_quote_spread(bid, ask, table.round_num)
+                    if not validation["valid"]:
+                        await manager.send_personal(current_pid, {"type": "error", "detail": validation["error"]})
+                        continue
+                    
                     table.quotes.append({"bid": bid, "ask": ask, "round": table.round_num, "maker": current_pid})
                     
                     # Save game state after quote
@@ -613,13 +931,34 @@ async def websocket_endpoint(ws: WebSocket, tid: str, pid: str):
                                 save_game_state(tables)
                                 
                                 # Notify players of hand completion and delay
-                                await manager.broadcast_table(table, {"type": "hand_complete", "message": "Hand complete! Starting new hand..."})
+                                await manager.broadcast_table(table, {"type": "hand_complete", "message": "Hand complete! Waiting for next hand to start..."})
                                 
-                                # Add delay before starting new hand
-                                await asyncio.sleep(2.5)  # 2.5 second delay
-                                
+                                # Set awaiting hand start instead of auto-starting
+                                table.awaiting_hand_start = True
                                 table.rotate_maker()
-                                leaving_players = table.new_hand()
+                                
+                                # Process leaving players without starting new hand
+                                players_to_remove = []
+                                leaving_players = []
+                                
+                                for pid, p in table.players.items():
+                                    if p.status == "pending_away":
+                                        p.status = "away"
+                                        print(f"Player {p.name} is now away (was pending)")
+                                    elif p.status == "pending_leaving":
+                                        leaving_players.append({"pid": pid, "name": p.name, "seat": p.seat})
+                                        p.status = "left"
+                                        table.left_players[pid] = p
+                                        players_to_remove.append(pid)
+                                        print(f"Player {p.name} has left the table (was pending)")
+                                
+                                # Remove players who are leaving
+                                for pid in players_to_remove:
+                                    del table.players[pid]
+                                    if pid in table.seat_order:
+                                        table.seat_order.remove(pid)
+                                    if table.seat_order and table.maker_idx >= len(table.seat_order):
+                                        table.maker_idx = 0
                                 
                                 # Send events for players who left due to pending status
                                 for leaving_player in leaving_players:
@@ -812,11 +1151,8 @@ async def websocket_endpoint(ws: WebSocket, tid: str, pid: str):
                     # Auto-start a new hand if we have 2+ players and no hand is in progress
                     active_players = [p for p in table.players.values() if p.status == "active"]
                     if len(active_players) >= 2 and table.round_num == 0 and not table.community:
-                        leaving_players = table.new_hand()
-                        print(f"Auto-started new hand with {len(active_players)} players")
-                    
-                    save_game_state(tables)
-                    await manager.broadcast_all_states(table)
+                        table.awaiting_hand_start = True
+                        print(f"Ready to start hand with {len(active_players)} players - awaiting manual start")
 
                 elif msg["action"] == "away":
                     # If in the middle of a hand, set pending away status
@@ -858,6 +1194,129 @@ async def websocket_endpoint(ws: WebSocket, tid: str, pid: str):
                 elif msg["action"] == "ping":
                     # Heartbeat - respond with pong
                     await manager.send_personal(current_pid, {"type": "pong"})
+
+                elif msg["action"] == "update_options":
+                    # Update game options (auction settings)
+                    auction_enabled = msg.get("auction_enabled", False)
+                    max_spreads = msg.get("max_spreads", [10, 10, 10, 10])
+                    current_max_width = msg.get("current_max_width", 10) # Get current_max_width
+                    
+                    # Validate max_spreads
+                    if not isinstance(max_spreads, list) or len(max_spreads) != 4:
+                        await manager.send_personal(current_pid, {"type": "error", "detail": "Invalid max spreads format"})
+                        continue
+                    
+                    for spread in max_spreads:
+                        if not isinstance(spread, (int, float)) or spread <= 0:
+                            await manager.send_personal(current_pid, {"type": "error", "detail": "All spreads must be positive numbers"})
+                            continue
+                    
+                    # Validate current_max_width
+                    if not isinstance(current_max_width, (int, float)) or current_max_width <= 0:
+                        await manager.send_personal(current_pid, {"type": "error", "detail": "Current max width must be a positive number"})
+                        continue
+                    
+                    table.auction_enabled = auction_enabled
+                    table.max_spreads = max_spreads
+                    table.current_max_width = current_max_width # Set current_max_width
+                    
+                    save_game_state(tables)
+                    
+                    # Broadcast options update
+                    await manager.broadcast_table(table, {
+                        "type": "options_updated",
+                        "auction_enabled": auction_enabled,
+                        "max_spreads": max_spreads,
+                        "current_max_width": current_max_width,
+                        "updated_by": table.players[current_pid].name if current_pid in table.players else "Unknown"
+                    })
+                    await manager.broadcast_all_states(table)
+
+                elif msg["action"] == "start_width_auction":
+                    # Start a width auction for market making
+                    if table.start_width_auction():
+                        save_game_state(tables)
+                        await manager.broadcast_table(table, {
+                            "type": "width_auction_started", 
+                            "timeout": table.width_auction_timeout,
+                            "eligible_players": table.eligible_makers
+                        })
+                        await manager.broadcast_all_states(table)
+                        asyncio.create_task(handle_auction_timeout(table.tid))
+                    else:
+                        await manager.send_personal(current_pid, {"type": "error", "detail": "Cannot start auction"})
+
+                elif msg["action"] == "start_hand":
+                    # Start a new hand manually
+                    if not table.awaiting_hand_start:
+                        await manager.send_personal(current_pid, {"type": "error", "detail": "No hand is waiting to start"})
+                        continue
+                    
+                    # Check if we have enough players
+                    active_players = [p for p in table.players.values() if p.status == "active"]
+                    if len(active_players) < 2:
+                        await manager.send_personal(current_pid, {"type": "error", "detail": "Need at least 2 players to start a hand"})
+                        continue
+                    
+                    # Start the new hand
+                    table.awaiting_hand_start = False
+                    leaving_players = table.new_hand()
+                    print(f"Manually started new hand with {len(active_players)} players")
+                    
+                    # Send events for any players who left during new hand setup
+                    for leaving_player in leaving_players:
+                        await manager.send_personal(leaving_player["pid"], {
+                            "type": "player_event",
+                            "event": "you_left", 
+                            "message": "You have left the table. Your game history is preserved.",
+                            "redirect_to_lobby": True
+                        })
+                        
+                        await manager.broadcast_table(table, {
+                            "type": "player_event",
+                            "event": "player_left",
+                            "player_id": leaving_player["pid"],
+                            "player_name": leaving_player["name"],
+                            "player_seat": leaving_player["seat"],
+                            "message": f"{leaving_player['name']} has left the table"
+                        })
+                    
+                    save_game_state(tables)
+                    await manager.broadcast_all_states(table)
+
+                elif msg["action"] == "submit_width_bid":
+                    # Submit a bid for market width
+                    width = float(msg.get("width", 0))
+                    result = table.submit_width_bid(current_pid, width)
+                    
+                    if result["success"]:
+                        save_game_state(tables)
+                        
+                        # Check if auction is complete
+                        if table.check_auction_complete():
+                            auction_result = table.resolve_width_auction()
+                            save_game_state(tables)
+                            
+                            # Broadcast auction results
+                            await manager.broadcast_table(table, {
+                                "type": "width_auction_complete",
+                                "result": auction_result
+                            })
+                            
+                            # Auction only determines market maker, no new hand needed
+                            print(f"Auction complete. Winner: {auction_result.get('winner_name', 'No winner')}")
+                            
+                            await manager.broadcast_all_states(table)
+                        else:
+                            # Broadcast bid received
+                            await manager.broadcast_table(table, {
+                                "type": "width_bid_received",
+                                "player_name": table.players[current_pid].name if current_pid in table.players else "Unknown",
+                                "bids_received": len(table.width_auction_bids),
+                                "total_eligible": len(table.eligible_makers)
+                            })
+                    else:
+                        await manager.send_personal(current_pid, {"type": "error", "detail": result["error"]})
 
             await push_state()
 

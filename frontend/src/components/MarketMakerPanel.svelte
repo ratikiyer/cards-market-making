@@ -1,7 +1,9 @@
 <script lang="ts">
   export let onQuote: (bid: number, ask: number) => void;
   export let currentQuote: any;
+  export let currentMaxWidth: number = 10;
   export let onClose: () => void = () => {};
+  export let gameState: any = {};
 
   let bidPrice = currentQuote?.bid || 50;
   let askPrice = currentQuote?.ask || 55;
@@ -13,14 +15,20 @@
   }
 
   function handleQuote() {
+    console.log('handleQuote called', { bidPrice, askPrice });
+    
     if (askPrice <= bidPrice) {
       alert('Ask must be higher than bid');
       return;
     }
-    if (bidPrice <= 0 || askPrice <= 0) {
-      alert('Prices must be positive');
+
+    // Check spread against current max width
+    const spread = askPrice - bidPrice;
+    if (spread > currentMaxWidth) {
+      alert(`Market width (${spread.toFixed(2)}) exceeds maximum allowed (${currentMaxWidth.toFixed(2)}). Please enter a narrower market.`);
       return;
     }
+    
     onQuote(bidPrice, askPrice);
     onClose(); // Close the panel after submitting
   }
@@ -29,7 +37,18 @@
     onClose();
   }
 
+  // Note: Removed auto-adjustment to prevent interference with user input
+
   $: spread = askPrice - bidPrice;
+  $: maxSpread = gameState?.auction_enabled && gameState?.max_spreads ? gameState.max_spreads[gameState.round] : null;
+  $: auctionWidth = gameState?.auction_winning_width;
+  $: spreadValid = (() => {
+    // Basic validation
+    if (spread <= 0) return false;
+    
+    // Check against current max width
+    return spread <= currentMaxWidth;
+  })();
 </script>
 
 <!-- Show modal directly when component is rendered -->
@@ -55,8 +74,9 @@
 
       <div class="spread-display">
         <div class="spread-label">Spread</div>
-        <div class="spread-value" class:invalid={spread <= 0}>
+        <div class="spread-value" class:invalid={spread <= 0 || !spreadValid}>
           {spread.toFixed(1)}
+          <span class="spread-limit">/ {currentMaxWidth} max</span>
         </div>
       </div>
 
@@ -89,7 +109,8 @@
       <button 
         class="btn btn-primary" 
         on:click={handleQuote}
-        disabled={spread <= 0}
+        disabled={!spreadValid}
+        title="Spread: {spread.toFixed(2)}, Valid: {spreadValid}, Disabled: {!spreadValid}"
       >
         Publish
       </button>
@@ -227,6 +248,12 @@
   .spread-value.invalid {
     color: #F44336;
     background: rgba(244, 67, 54, 0.1);
+  }
+
+  .spread-limit {
+    color: #999;
+    font-size: 0.8em;
+    margin-left: 4px;
   }
 
   .quote-preview {

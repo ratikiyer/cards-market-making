@@ -16,8 +16,8 @@
   const toastMessage = writable(''); // For showing notifications
   const joiningStatus = writable(''); // Track joining status
 
-  const backendURL = 'http://localhost:8000';
-  const wsURL = 'ws://localhost:8000';
+  const backendURL = `http://${window.location.hostname}:8000`;
+  const wsURL = `ws://${window.location.hostname}:8000`;
   const tid = 'default';
   let ws: WebSocket;
   let reconnectAttempts = 0;
@@ -246,6 +246,28 @@
         // Could show a toast notification here if desired
       } else if (message.type === 'pong') {
         // Heartbeat response - connection is healthy
+      } else if (message.type === 'options_updated') {
+        console.log('Options updated:', message);
+        showToast(`Game options updated by ${message.updated_by}`, 3000);
+      } else if (message.type === 'width_auction_started') {
+        console.log('Width auction started:', message);
+        showToast('Width auction started! Submit your bid.', 3000);
+      } else if (message.type === 'auction_timer_update') {
+        // Update auction timer in real-time
+        gameState.update(state => ({
+          ...state,
+          auction_time_remaining: message.time_remaining
+        }));
+      } else if (message.type === 'width_bid_received') {
+        console.log('Width bid received:', message);
+        // Could show a notification about bid progress
+      } else if (message.type === 'width_auction_complete' || message.type === 'width_auction_timeout') {
+        console.log('Width auction complete:', message);
+        if (message.result && message.result.winner) {
+          showToast(`Auction won by ${message.result.winner_name} with spread ${message.result.winning_width}`, 5000);
+        } else {
+          showToast('Auction completed with no bids', 3000);
+        }
       }
     };
     
