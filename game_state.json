@@ -1,0 +1,142 @@
+{
+  "default": {
+    "tid": "default",
+    "players": {
+      "ce26138c-7a99-4720-aae8-b3fce80b2423": {
+        "pid": "ce26138c-7a99-4720-aae8-b3fce80b2423",
+        "name": "ratik",
+        "seat": 4,
+        "stack": 1000,
+        "buy_in": 1000,
+        "pnl": 0,
+        "cards": [
+          "7S",
+          "JS"
+        ],
+        "status": "active"
+      },
+      "17d28491-dfc8-498f-be13-83b3ecbced17": {
+        "pid": "17d28491-dfc8-498f-be13-83b3ecbced17",
+        "name": "sosa",
+        "seat": 5,
+        "stack": 1000,
+        "buy_in": 1000,
+        "pnl": 0,
+        "cards": [
+          "3C",
+          "2D"
+        ],
+        "status": "active"
+      }
+    },
+    "seat_order": [
+      "ce26138c-7a99-4720-aae8-b3fce80b2423",
+      "17d28491-dfc8-498f-be13-83b3ecbced17"
+    ],
+    "maker_idx": 0,
+    "deck": [
+      "QD",
+      "7C",
+      "QS",
+      "TH",
+      "6D",
+      "3S",
+      "8H",
+      "8C",
+      "8D",
+      "JD",
+      "9H",
+      "9S",
+      "AH",
+      "3H",
+      "8S",
+      "7D",
+      "QC",
+      "AD",
+      "9C",
+      "JC",
+      "5C",
+      "JH",
+      "9D",
+      "4S",
+      "4C",
+      "AS",
+      "KD",
+      "6H",
+      "QH",
+      "7H",
+      "6C",
+      "KH",
+      "AC",
+      "4H",
+      "2H",
+      "6S",
+      "3D",
+      "4D",
+      "5H",
+      "2C",
+      "2S",
+      "KS",
+      "TC",
+      "5S",
+      "TD",
+      "KC",
+      "5D"
+    ],
+    "community": [
+      "TS"
+    ],
+    "round_num": 1,
+    "trades": [
+      {
+        "pid": "ce26138c-7a99-4720-aae8-b3fce80b2423",
+        "side": "buy",
+        "price": 51.0,
+        "round": 0
+      }
+    ],
+    "quotes": [
+      {
+        "bid": 50.0,
+        "ask": 51.0,
+        "round": 0,
+        "maker": "17d28491-dfc8-498f-be13-83b3ecbced17"
+      }
+    ],
+    "round_trades": [],
+    "hand_number": 1,
+    "game_history": [],
+    "max_history_hands": 100,
+    "left_players": {},
+    "auction_enabled": true,
+    "max_spreads": [
+      10,
+      10,
+      10,
+      10
+    ],
+    "current_max_width": 5.0,
+    "awaiting_hand_start": false,
+    "width_auction_active": false,
+    "width_auction_bids": {
+      "ce26138c-7a99-4720-aae8-b3fce80b2423": {
+        "width": 5.0,
+        "timestamp": 1756258132.804577
+      },
+      "17d28491-dfc8-498f-be13-83b3ecbced17": {
+        "width": 6.0,
+        "timestamp": 1756258139.572099
+      }
+    },
+    "width_auction_start_time": 1756258116.984016,
+    "width_auction_timeout": 30,
+    "auction_time_remaining": 0,
+    "auction_completed_this_round": true,
+    "eligible_makers": [
+      "ce26138c-7a99-4720-aae8-b3fce80b2423",
+      "17d28491-dfc8-498f-be13-83b3ecbced17"
+    ],
+    "auction_maker": "ce26138c-7a99-4720-aae8-b3fce80b2423",
+    "auction_winning_width": 5.0
+  }
+}
